@@ -3,6 +3,8 @@ name = "http-proxy"
 version = "0.1.0"
 authors = ["劉安 <liuan@sgcc.com.cn>"]
 edition = "2018"
+license = "GPL-3.0"
+description = "SuperHacker's HTTP/HTTPS Proxy"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
