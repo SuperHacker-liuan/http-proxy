@@ -1,4 +1,5 @@
 use crate::Result;
+use crate::CONFIG;
 use async_std::io;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
@@ -8,7 +9,6 @@ use async_std::task;
 use futures::future::FutureExt;
 use httparse::Request;
 use std::net::SocketAddr;
-use crate::CONFIG;
 
 pub async fn run() -> Result<()> {
     let server = TcpListener::bind(CONFIG.listen).await?;
