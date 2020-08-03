@@ -8,10 +8,10 @@ use async_std::task;
 use futures::future::FutureExt;
 use httparse::Request;
 use std::net::SocketAddr;
+use crate::CONFIG;
 
 pub async fn run() -> Result<()> {
-    let server = format!(":::5555");
-    let server = TcpListener::bind(server).await?;
+    let server = TcpListener::bind(CONFIG.listen).await?;
     let mut server = server.incoming();
     while let Some(stream) = server.next().await {
         let stream = stream?;
@@ -90,16 +90,17 @@ async fn parse_host(host: String) -> Option<SocketAddr> {
 }
 
 async fn response_connect(stream: &mut TcpStream) -> Result<()> {
+    const NEW_LINE: &str = "\r\n";
     static CONNECT_RESP: &[&str] = &[
         "HTTP/1.1 200 Tunnel established",
-        "Proxy: SuperHacker HTTP Proxy/0.1.0",
+        NEW_LINE,
+        "Proxy: SuperHacker HTTP Proxy/",
+        clap::crate_version!(),
+        NEW_LINE,
+        NEW_LINE,
     ];
-    const NEW_LINE: &str = "\r\n";
 
-    for resp in CONNECT_RESP.iter() {
-        let resp = [resp, NEW_LINE].concat();
-        stream.write_all(resp.as_bytes()).await?;
-    }
-    stream.write_all(NEW_LINE.as_bytes()).await?;
+    let resp = CONNECT_RESP.concat();
+    stream.write_all(resp.as_bytes()).await?;
     Ok(())
 }
