@@ -19,7 +19,7 @@ fn daemonize() {
         return;
     }
     Daemonize::new()
-        .pid_file(format!("/tmp/http-proxy@{}.pid", 5555))
+        .pid_file(format!("/tmp/http-proxy@{}.pid", CONFIG.listen))
         .working_directory("/tmp")
         .umask(0o777)
         .start()
