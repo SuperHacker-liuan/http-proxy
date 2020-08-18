@@ -1,3 +1,4 @@
+use crate::config::SiteControl;
 use crate::Result;
 use crate::CONFIG;
 use async_std::io;
@@ -17,7 +18,7 @@ pub async fn run() -> Result<()> {
         let stream = stream?;
         task::spawn(async move {
             if let Err(e) = serve_conn(stream).await {
-                eprintln!("Connection Error: {:?}", e);
+                log::error!("Connection Error: {:?}", e);
             }
         });
     }
@@ -25,21 +26,22 @@ pub async fn run() -> Result<()> {
 }
 
 async fn serve_conn(mut stream: TcpStream) -> Result<()> {
-    let mut buf = vec![0u8; 1024];
+    let mut buf = vec![0u8; 65536];
     let n = stream.read(&mut buf).await?;
     let mut headers = [httparse::EMPTY_HEADER; 16];
     let mut request = Request::new(&mut headers);
+    let from = format!("{}", stream.peer_addr()?);
 
     request.parse(&buf[0..n])?;
     let host = match parse_headers(&request)? {
         Some(host) => host,
         None => {
-            eprintln!("Invalid Request, lack of Host");
+            log::warn!("Invalid Request, lack of Host");
             return Ok(());
         }
     };
 
-    let mut target = match parse_host(host).await {
+    let mut target = match parse_host(host, &from).await {
         Some(addr) => TcpStream::connect(addr).await?,
         None => return Ok(()),
     };
@@ -63,6 +65,17 @@ async fn serve_conn(mut stream: TcpStream) -> Result<()> {
     Ok(())
 }
 
+fn check_valid(host: &str, port: u16, from: &str) -> bool {
+    let valid = match &CONFIG.site_control {
+        SiteControl::Disable => true,
+        SiteControl::Allow(list) => list.iter().find(|policy| host.ends_with(*policy)).is_some(),
+    };
+    if !valid {
+        log::info!("Not Allowed {}:{}, from {}", host, port, from);
+    }
+    valid
+}
+
 fn parse_headers(request: &Request) -> Result<Option<String>> {
     for header in request.headers.iter() {
         if header.name == "Host" {
@@ -72,13 +85,24 @@ fn parse_headers(request: &Request) -> Result<Option<String>> {
     Ok(None)
 }
 
-async fn parse_host(host: String) -> Option<SocketAddr> {
+async fn parse_host(host: String, from: &str) -> Option<SocketAddr> {
     let addr = match host.parse::<SocketAddr>() {
-        Ok(addr) => addr,
+        Ok(addr) => {
+            // IP:port
+            let host = format!("{}", addr.ip());
+            if !check_valid(&host, addr.port(), from) {
+                return None;
+            }
+            addr
+        }
         Err(_) => {
+            // no port(use default 80) || use domain
             let mut parts = host.splitn(2, ":");
             let host = parts.next()?;
             let port: u16 = parts.next().unwrap_or("80").parse().ok()?;
+            if !check_valid(&host, port, from) {
+                return None;
+            }
             format!("{}:{}", host, port)
                 .to_socket_addrs()
                 .await

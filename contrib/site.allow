@@ -1,0 +1,13 @@
+# Lines starts with # is comment.
+# One ip / domain per line.
+# example
+::1
+127.0.0.1
+zyrj.org
+
+# Rust
+crates.io
+github.com
+rust-lang.org
+
+# User's customize

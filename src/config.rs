@@ -20,6 +20,7 @@ pub struct Config {
     pub site_control: SiteControl,
 }
 
+#[derive(Debug)]
 pub enum SiteControl {
     Disable,
     Allow(Vec<String>),
@@ -85,6 +86,19 @@ fn command_config() -> App<'static, 'static> {
 
 fn parse_config() -> Config {
     let matches = command_config().get_matches();
+
+    // Init log
+    let term_logger = TermLogger::new(LevelFilter::Debug, logger_config(), TerminalMode::Mixed);
+    let logger: Vec<Box<dyn SharedLogger>> = match matches.value_of("fail-log") {
+        Some(file) => {
+            let file = File::create(file).expect(&einfo("fail-log"));
+            let logger = WriteLogger::new(LevelFilter::Info, logger_config(), file);
+            vec![term_logger, logger]
+        }
+        None => vec![term_logger],
+    };
+    let _ = CombinedLogger::init(logger);
+
     let listen = matches
         .value_of("listen")
         .unwrap_or("0.0.0.0:32767")
@@ -100,22 +114,7 @@ fn parse_config() -> Config {
         };
         SiteControl::Allow(list)
     };
-
-    // Init log
-    let term_logger = TermLogger::new(
-        LevelFilter::Info,
-        simplelog::Config::default(),
-        TerminalMode::Mixed,
-    );
-    let logger: Vec<Box<dyn SharedLogger>> = match matches.value_of("fail-log") {
-        Some(file) => {
-            let file = File::create(file).expect(&einfo("fail-log"));
-            let logger = WriteLogger::new(LevelFilter::Info, simplelog::Config::default(), file);
-            vec![term_logger, logger]
-        }
-        None => vec![term_logger],
-    };
-    let _ = CombinedLogger::init(logger);
+    log::debug!("SiteControl: {:?}", site_control);
 
     Config {
         listen: listen,
@@ -128,13 +127,20 @@ fn einfo(info: &str) -> String {
     ["Unable to parse ", info].concat()
 }
 
+fn logger_config() -> simplelog::Config {
+    simplelog::ConfigBuilder::new()
+        .set_time_format_str("%F %T")
+        .build()
+}
+
 fn parse_sites(conf: &Path) -> Result<Vec<String>, Box<dyn Error>> {
     let mut file = File::open(conf)?;
     let mut conf = String::new();
     file.read_to_string(&mut conf)?;
     let conf = conf
         .lines()
-        .filter(|s| !s.starts_with("#") || s.trim().len() > 0)
+        .map(|s| s.trim())
+        .filter(|s| !s.starts_with("#") && s.len() > 0)
         .map(|s| s.into())
         .collect();
     Ok(conf)

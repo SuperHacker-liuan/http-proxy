@@ -9,7 +9,7 @@ mod proxy;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 fn main() {
-    println!("Proxy listen on {}", CONFIG.listen);
+    log::info!("Proxy listen on {}", CONFIG.listen);
     daemonize();
     task::block_on(proxy::run()).expect("EXIT ");
 }
