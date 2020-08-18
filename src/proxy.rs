@@ -82,7 +82,10 @@ fn parse_headers(request: &Request) -> Result<Option<String>> {
             return Ok(Some(String::from_utf8(header.value.to_vec())?));
         }
     }
-    Ok(None)
+    match request.method {
+        Some("CONNECT") => Ok(request.path.map(|s| String::from(s))),
+        _ => Ok(None),
+    }
 }
 
 async fn parse_host(host: String, from: &str) -> Option<SocketAddr> {
