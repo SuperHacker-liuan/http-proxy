@@ -1,6 +1,12 @@
 use clap::App;
 use clap::Arg;
 use once_cell::sync::Lazy;
+use simplelog::CombinedLogger;
+use simplelog::LevelFilter;
+use simplelog::SharedLogger;
+use simplelog::TermLogger;
+use simplelog::TerminalMode;
+use simplelog::WriteLogger;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -94,6 +100,23 @@ fn parse_config() -> Config {
         };
         SiteControl::Allow(list)
     };
+
+    // Init log
+    let term_logger = TermLogger::new(
+        LevelFilter::Info,
+        simplelog::Config::default(),
+        TerminalMode::Mixed,
+    );
+    let logger: Vec<Box<dyn SharedLogger>> = match matches.value_of("fail-log") {
+        Some(file) => {
+            let file = File::create(file).expect(&einfo("fail-log"));
+            let logger = WriteLogger::new(LevelFilter::Info, simplelog::Config::default(), file);
+            vec![term_logger, logger]
+        }
+        None => vec![term_logger],
+    };
+    let _ = CombinedLogger::init(logger);
+
     Config {
         listen: listen,
         daemon: daemon,
