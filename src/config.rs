@@ -1,5 +1,6 @@
 use clap::App;
 use clap::Arg;
+use clap::ArgGroup;
 use once_cell::sync::Lazy;
 use simplelog::CombinedLogger;
 use simplelog::LevelFilter;
@@ -24,6 +25,7 @@ pub struct Config {
 pub enum SiteControl {
     Disable,
     Allow(Vec<String>),
+    Block(Vec<String>),
 }
 
 pub static CONFIG: Lazy<Config> = Lazy::new(parse_config);
@@ -49,6 +51,16 @@ fn command_config() -> App<'static, 'static> {
                 .long("allowed-site")
                 .value_name("SITE.ALLOW")
                 .help("site control, only accept ip/domains in SITE.ALLOW file")
+                .takes_value(true)
+                .multiple(false)
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("block-site")
+                .short("B")
+                .long("block-site")
+                .value_name("SITE.BLOCK")
+                .help("site control, block ip/domains in SITE.BLOCK file")
                 .takes_value(true)
                 .multiple(false)
                 .required(false),
@@ -82,6 +94,12 @@ fn command_config() -> App<'static, 'static> {
                 .multiple(false)
                 .required(false),
         )
+        .group(
+            ArgGroup::with_name("site control mode")
+                .args(&["allow-all", "allowed-site", "block-site"])
+                .multiple(false)
+                .required(true),
+        )
 }
 
 fn parse_config() -> Config {
@@ -107,12 +125,14 @@ fn parse_config() -> Config {
     let daemon = matches.is_present("daemon");
     let site_control = if matches.is_present("allow-all") {
         SiteControl::Disable
-    } else {
-        let list = match matches.value_of("allowed-site") {
-            Some(file) => parse_sites(file.as_ref()).expect(&einfo("SITE.ALLOW")),
-            None => vec![],
-        };
+    } else if let Some(file) = matches.value_of("block-site") {
+        let list = parse_sites(file.as_ref()).expect(&einfo("SITE.BLOCK"));
+        SiteControl::Block(list)
+    } else if let Some(file) = matches.value_of("allowed-site") {
+        let list = parse_sites(file.as_ref()).expect(&einfo("SITE.ALLOW"));
         SiteControl::Allow(list)
+    } else {
+        unreachable!();
     };
     log::debug!("SiteControl: {:?}", site_control);
 

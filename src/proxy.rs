@@ -66,14 +66,23 @@ async fn serve_conn(mut stream: TcpStream) -> Result<()> {
 }
 
 fn check_valid(host: &str, port: u16, from: &str) -> bool {
-    let valid = match &CONFIG.site_control {
+    match &CONFIG.site_control {
         SiteControl::Disable => true,
-        SiteControl::Allow(list) => list.iter().find(|policy| host.ends_with(*policy)).is_some(),
-    };
-    if !valid {
-        log::info!("Not Allowed {}:{}, from {}", host, port, from);
+        SiteControl::Allow(list) => match list.iter().find(|policy| host.ends_with(*policy)) {
+            Some(_) => true,
+            None => {
+                log::info!("Not Allowed {}:{}, from {}", host, port, from);
+                false
+            }
+        },
+        SiteControl::Block(list) => match list.iter().find(|policy| host.ends_with(*policy)) {
+            Some(_) => false,
+            None => {
+                log::info!("Accept {}:{}, from {}", host, port, from);
+                true
+            }
+        },
     }
-    valid
 }
 
 fn parse_headers(request: &Request) -> Result<Option<String>> {
