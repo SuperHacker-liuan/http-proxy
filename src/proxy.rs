@@ -36,7 +36,12 @@ async fn serve_conn(mut stream: TcpStream) -> Result<()> {
     let host = match parse_headers(&request)? {
         Some(host) => host,
         None => {
-            log::warn!("Invalid Request, lack of Host");
+            log::warn!(
+                "Cannot parse Host, {:?} {:?} {:?}",
+                request.method,
+                request.path,
+                request.version
+            );
             return Ok(());
         }
     };
@@ -54,10 +59,8 @@ async fn serve_conn(mut stream: TcpStream) -> Result<()> {
     // Sync Local/Remote Read/Write
     let (lr, lw) = &mut (&stream, &stream);
     let (rr, rw) = &mut (&target, &target);
-
     let cp1 = io::copy(lr, rw);
     let cp2 = io::copy(rr, lw);
-
     futures::select! {
         r1 = cp1.fuse() => r1?,
         r2 = cp2.fuse() => r2?,
