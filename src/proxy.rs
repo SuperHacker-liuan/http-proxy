@@ -26,9 +26,15 @@ pub async fn run() -> Result<()> {
 }
 
 async fn serve_conn(mut stream: TcpStream) -> Result<()> {
-    let mut buf = vec![0u8; 65536];
+    let mut buf = vec![0u8; 4096];
     let n = stream.read(&mut buf).await?;
-    let mut headers = [httparse::EMPTY_HEADER; 16];
+    if n < 21 {
+        // CONNECT a.cn HTTP/2\r\n, total 21 bytes
+        // Add this to drop Non-HTTP connects
+        return Ok(())
+    }
+
+    let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut request = Request::new(&mut headers);
     let from = format!("{}", stream.peer_addr()?);
 
@@ -37,10 +43,11 @@ async fn serve_conn(mut stream: TcpStream) -> Result<()> {
         Some(host) => host,
         None => {
             log::warn!(
-                "Cannot parse Host, {:?} {:?} {:?}",
+                "Cannot parse Host, {:?} {:?} {:?}, from {}",
                 request.method,
                 request.path,
-                request.version
+                request.version,
+                &from
             );
             return Ok(());
         }
