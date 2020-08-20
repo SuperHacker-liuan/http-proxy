@@ -26,11 +26,13 @@ pub async fn run() -> Result<()> {
 }
 
 async fn serve_conn(mut stream: TcpStream) -> Result<()> {
+    // CONNECT a.jp HTTP/2\r\n\r\n, total 23 bytes,
+    // shorter than this must not HTTP requests
+    // Add this to drop Non-HTTP connects
+    const HTTP_MINIMUM_BYTES: usize = 23;
     let mut buf = vec![0u8; 4096];
     let n = stream.read(&mut buf).await?;
-    if n < 21 {
-        // CONNECT a.cn HTTP/2\r\n, total 21 bytes
-        // Add this to drop Non-HTTP connects
+    if n < HTTP_MINIMUM_BYTES {
         return Ok(())
     }
 
