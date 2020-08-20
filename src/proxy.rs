@@ -1,4 +1,5 @@
 use crate::config::SiteControl;
+use crate::error::HttpProxyError;
 use crate::Result;
 use crate::CONFIG;
 use async_std::io;
@@ -17,8 +18,10 @@ pub async fn run() -> Result<()> {
     while let Some(stream) = server.next().await {
         let stream = stream?;
         task::spawn(async move {
-            if let Err(e) = serve_conn(stream).await {
-                log::error!("Connection Error: {:?}", e);
+            match serve_conn(stream).await {
+                Ok(_) => {}
+                Err(HttpProxyError::HttpParse(_)) => {}
+                Err(e) => log::error!("Connection Error: {:?}", e),
             }
         });
     }
@@ -33,7 +36,7 @@ async fn serve_conn(mut stream: TcpStream) -> Result<()> {
     let mut buf = vec![0u8; 4096];
     let n = stream.read(&mut buf).await?;
     if n < HTTP_MINIMUM_BYTES {
-        return Ok(())
+        return Ok(());
     }
 
     let mut headers = [httparse::EMPTY_HEADER; 64];

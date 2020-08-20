@@ -1,12 +1,12 @@
 use self::config::CONFIG;
 use async_std::task;
 use daemonize::Daemonize;
-use std::error::Error;
 
 mod config;
+mod error;
 mod proxy;
 
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
+type Result<T> = std::result::Result<T, error::HttpProxyError>;
 
 fn main() {
     log::info!("Proxy listen on {}", CONFIG.listen);
